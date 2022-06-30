@@ -172,7 +172,7 @@ const loadModel = async function () {
     );
   });
 
-  const NUM_MINUTE_PREDICT = 5;
+  const NUM_MINUTE_PREDICT = 1;
 
   const lastdateString = stockDataRaw[stockDataRaw.length - 1].datetime;
   console.log("tf.js", "lastdateString ", lastdateString);
@@ -185,7 +185,10 @@ const loadModel = async function () {
       if (obj.timestamp - timestamp >= NUM_MINUTE_PREDICT * MINUTE) {
         timestamp = obj.timestamp;
 
-        stockDataRaw.push({ close: obj.price });
+        const date = new Date(timestamp * 1000);
+        console.log("tf.js", "date");
+
+        stockDataRaw.push({ close: obj.price, datetime: date.toDateString() });
         stockData.push(obj.price);
 
         await predict_10();
@@ -196,7 +199,11 @@ const loadModel = async function () {
           listclient.forEach((ws) => {
             ws.send(
               JSON.stringify({
-                newStock: obj,
+                type: "new",
+                stock: stockDataRaw.slice(
+                  stockDataRaw.length - 40,
+                  stockDataRaw.length
+                ),
                 predict: {
                   price: predictedData,
                   interval: NUM_MINUTE_PREDICT,
@@ -214,10 +221,20 @@ const loadModel = async function () {
   wss.on("connection", (ws) => {
     ws.on("message", function message(data) {
       console.log("received: %s", data);
+      if (data.type && data.type == "all") {
+        ws.send(
+          JSON.stringify({
+            type: "all",
+            stock: stockDataRaw,
+            predict: predictedData,
+          })
+        );
+      }
     });
     listclient.push(ws);
     ws.send(
       JSON.stringify({
+        type: "init",
         stock: stockDataRaw,
         predict: predictedData,
       })
